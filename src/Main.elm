@@ -4,6 +4,7 @@ import Html exposing (Html, section, div, header, h1, text, footer, a, form, inp
 import Html.Attributes exposing (class, type_, maxlength, placeholder, id, href)
 import Html.Events exposing (onInput, onSubmit)
 import Http
+import Decode exposing (list, string)
 
 type alias Model = 
     { search: String
@@ -54,13 +55,14 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         InputSearch value ->
-            ( model, Cmd.none )
+            ( { model | search = value } , Cmd.none )
 
         SubmitSearch ->
-            ( model, Cmd.none )
+            ( model
+            , Http.get ("/titles?search=" ++ model.value) (list string)
 
         ReceiveSearch (Ok results) ->
-            ( model, Cmd.none )
+            ( { model | results = results }, Cmd.none )
 
         ReceiveSearch (Err error) ->
             ( model, Cmd.none )
