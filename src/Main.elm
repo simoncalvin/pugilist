@@ -1,26 +1,33 @@
 module Main exposing (main)
 
-import Html exposing (Html, a, button, div, footer, form, h1, header, input, li, main_, p, section, text, ul)
-import Html.Attributes exposing (class, href, id, maxlength, placeholder, type_)
-import Html.Events exposing (onInput, onSubmit)
-import Http exposing (get, send)
-import Json.Decode exposing (list, string)
+import Html exposing (Html, div, footer, h1, header, li, main_, p, section, text, ul)
+import Html.Attributes exposing (class, id, type_)
+import Http
+import Request.Release as Releases exposing (Release)
 
 
 type alias Model =
-    { search : String
-    , results : List String
+    { current : List Release
+    , error : String
     }
 
 
 main : Program Never Model Msg
 main =
     Html.program
-        { init = ( Model "" [], Cmd.none )
+        { init = init
         , update = update
         , view = view
         , subscriptions = always Sub.none
         }
+
+
+init : ( Model, Cmd Msg )
+init =
+    ( Model [] ""
+    , Releases.getCurrent
+        |> Http.send Load
+    )
 
 
 view : Model -> Html Msg
@@ -30,45 +37,45 @@ view model =
             [ h1 [] [ text "pugilist: your pull list" ] ]
         , main_ []
             [ p [ class "bold" ] [ text "Oh hi," ]
-            , p [] [ text "Tell me a title on your list:" ]
-            , form [ onSubmit SubmitSearch ]
-                [ input [ onInput InputSearch, type_ "text", maxlength 100, placeholder "Title!" ]
-                    [ text model.search ]
-                , button [ type_ "submit" ] [ text "Submit" ]
-                ]
+            , p [] [ text "Here are the new comics for this week:" ]
+
+            -- , form [ onSubmit SubmitSearch ]
+            --     [ input [ onInput InputSearch, type_ "text", maxlength 100, placeholder "Title!" ]
+            --         [ text model.search ]
+            --     , button [ type_ "submit" ] [ text "Submit" ]
+            --     ]
             , section [ class "dreams" ]
-                [ p [] [ text "Which one?" ]
-                , ul [ id "results" ]
-                    (model.results |> List.map (\dream -> li [] [ text dream ]))
+                [ -- p [] [ text "Which one?" ]
+                  --,
+                  ul [ id "results" ]
+                    (model.current
+                        |> List.map .title
+                        |> List.map (\x -> li [] [ text x ])
+                    )
+                , p [] [ text model.error ]
                 ]
             ]
         , footer []
-            [ a [ href "https://glitch.com" ]
-                [ text "Remix this in Glitch" ]
+            [--a [ href "https://glitch.com" ]
+             --    [ text "Remix this in Glitch" ]
             ]
         ]
 
 
 type Msg
-    = InputSearch String
-    | SubmitSearch
-    | ReceiveSearch (Result Http.Error (List String))
+    = Load (Result Http.Error (List Release))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        InputSearch value ->
-            ( { model | search = value }, Cmd.none )
+        Load (Ok releases) ->
+            ( { model | current = releases }, Cmd.none )
 
-        SubmitSearch ->
-            ( model
-            , Http.get ("/titles?search=" ++ model.search) (list string)
-                |> Http.send ReceiveSearch
-            )
+        Load (Err error) ->
+            case error of
+                Http.BadPayload message _ ->
+                    ( { model | error = message }, Cmd.none )
 
-        ReceiveSearch (Ok results) ->
-            ( { model | results = results }, Cmd.none )
-
-        ReceiveSearch (Err error) ->
-            ( model, Cmd.none )
+                otherwise ->
+                    ( model, Cmd.none )
